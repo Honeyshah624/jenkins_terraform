@@ -23,7 +23,12 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                sh 'terraform init'
+                sh """
+                terraform init \
+                -backend-config="bucket=myproject-terraform-state-${ENV}" \
+                -backend-config="region=${AWS_REGION}" \
+                -backend-config="dynamodb_table=terraform-locks-${ENV}"
+                """
             }
         }
 
@@ -31,8 +36,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    if terraform workspace list | grep -w ${ENV}
-                    then
+                    if terraform workspace list | grep -qw ${ENV}; then
                         echo "Workspace exists"
                         terraform workspace select ${ENV}
                     else
@@ -46,14 +50,14 @@ pipeline {
 
         stage('Terraform Plan') {
             steps {
-                sh 'terraform plan'
+                sh "terraform plan -var-file=env/${ENV}.tfvars"
             }
         }
 
         stage('Terraform Apply') {
             steps {
                 input "Approve Apply?"
-                sh 'terraform apply -auto-approve'
+                sh "terraform apply -var-file=env/${ENV}.tfvars -auto-approve"
             }
         }
 
