@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'ENV',
+            choices: ['dev','stage','prod'],
+            description: 'Select Terraform Workspace'
+        )
+    }
+
+    environment {
+        AWS_REGION = "ap-south-1"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                sh 'terraform init'
+            }
+        }
+
+        stage('Workspace Handling') {
+            steps {
+                script {
+                    sh """
+                    if terraform workspace list | grep -w ${ENV}
+                    then
+                        echo "Workspace exists"
+                        terraform workspace select ${ENV}
+                    else
+                        echo "Creating workspace"
+                        terraform workspace new ${ENV}
+                    fi
+                    """
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                sh 'terraform plan'
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                input "Approve Apply?"
+                sh 'terraform apply -auto-approve'
+            }
+        }
+
+    }
+}
