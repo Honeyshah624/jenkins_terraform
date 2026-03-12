@@ -1,4 +1,4 @@
-pipeline {  
+pipeline {
     agent any
 
     environment {
@@ -7,12 +7,17 @@ pipeline {
         AWS_DEFAULT_REGION    = 'ap-south-1'
         TF_IN_AUTOMATION      = 'true'
     }
-    
+
     parameters {
         choice(
             name: 'ENVIRONMENT',
             choices: ['dev', 'stage', 'prod'],
             description: 'Select environment'
+        )
+        booleanParam(
+            name: 'DESTROY',
+            defaultValue: false,
+            description: 'Destroy infrastructure instead of apply'
         )
     }
 
@@ -49,12 +54,18 @@ pipeline {
         }
 
         stage('Terraform Plan') {
+            when {
+                expression { return !params.DESTROY }
+            }
             steps {
                 sh 'terraform plan -out=tfplan > plan_output.txt'
             }
         }
 
         stage('Manual Approval') {
+            when {
+                expression { return !params.DESTROY }
+            }
             steps {
                 script {
                     def planOutput = readFile('plan_output.txt')
@@ -65,32 +76,31 @@ pipeline {
         }
 
         stage('Terraform Apply') {
+            when {
+                expression { return !params.DESTROY }
+            }
             steps {
                 sh 'terraform apply -auto-approve tfplan'
+            }
+        }
+
+        stage('Terraform Destroy') {
+            when {
+                expression { return params.DESTROY }
+            }
+            steps {
+                input message: "Are you sure you want to destroy the infrastructure?", ok: "Yes, Destroy"
+                sh 'terraform destroy -auto-approve'
             }
         }
     }
 
     post {
         success {
-            echo "Terraform applied successfully."
+            echo "Pipeline executed successfully."
         }
         failure {
             echo "Pipeline failed. Check logs."
         }
     }
-    stage('Terraform destroy') {
-            steps {
-                sh 'terraform destroy -auto-approve'
-            }
-        }
- 
-    }
-    post {
-        success {
-            echo "Terraform destroy successfully."
-        }
-        failure {
-            echo "Pipeline failed. Check logs."
-        }
-    }
+}
