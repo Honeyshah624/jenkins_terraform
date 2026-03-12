@@ -1,8 +1,7 @@
 pipeline {  
     agent any
- 
-        environment {
-        // // AWS credentials from Jenkins credential store
+
+    environment {
         AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
         AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
         AWS_DEFAULT_REGION    = 'ap-south-1'
@@ -16,22 +15,16 @@ pipeline {
             description: 'Select environment'
         )
     }
- 
- 
- 
+
     stages {
- 
+
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/Honeyshah624/jenkins_terraform.git'
             }
         }
- 
+
         stage('Terraform Init') {
-                environment {
-                AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
-                AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
-            }
             steps {
                 sh '''
                 terraform init -reconfigure \
@@ -41,7 +34,7 @@ pipeline {
                 '''
             }
         }
- 
+
         stage('Workspace Setup') {
             steps {
                 sh """
@@ -54,25 +47,36 @@ pipeline {
                 """
             }
         }
- 
-    stage('Terraform Plan') {
-                environment {
-                AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
-                AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
-            }
+
+        stage('Terraform Plan') {
             steps {
-                sh 'terraform plan'
+                sh 'terraform plan -out=tfplan > plan_output.txt'
             }
         }
- 
-        stage('Terraform Apply') {
-            environment {
-                AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
-                AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
-            }
+
+        stage('Manual Approval') {
             steps {
-                sh 'terraform apply -auto-approve'
+                script {
+                    def planOutput = readFile('plan_output.txt')
+                    input message: "Review the Terraform Plan before applying:\n\n${planOutput}",
+                          ok: 'Proceed with Apply'
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                sh 'terraform apply -auto-approve tfplan'
             }
         }
     }
-}   
+
+    post {
+        success {
+            echo "Terraform applied successfully."
+        }
+        failure {
+            echo "Pipeline failed. Check logs."
+        }
+    }
+}
