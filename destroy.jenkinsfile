@@ -1,106 +1,102 @@
-pipeline {
-    agent any
+pipeline {  
 
-    environment {
+    agent any
+ 
+        environment {
+
         AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
+
         AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
+
         AWS_DEFAULT_REGION    = 'ap-south-1'
+
         TF_IN_AUTOMATION      = 'true'
+
     }
 
     parameters {
+
         choice(
+
             name: 'ENVIRONMENT',
+
             choices: ['dev', 'stage', 'prod'],
+
             description: 'Select environment'
-        )
-        booleanParam(
-            name: 'DESTROY',
-            defaultValue: false,
-            description: 'Destroy infrastructure instead of apply'
-        )
-    }
 
+        )
+
+    }
+ 
+ 
     stages {
-
+ 
         stage('Checkout') {
+
             steps {
+
                 git branch: 'main', url: 'https://github.com/Honeyshah624/jenkins_terraform.git'
-            }
-        }
 
+            }
+
+        }
+ 
         stage('Terraform Init') {
+
             steps {
+
                 sh '''
+
                 terraform init -reconfigure \
+
                 -backend-config="bucket=terraform-remote-state-workspace2" \
+
                 -backend-config="key=terraform/terraform.tfstate" \
+
                 -backend-config="region=ap-south-1"
+
                 '''
-            }
-        }
 
+            }
+
+        }
+ 
         stage('Workspace Setup') {
+
             steps {
+
                 sh """
+
                 if terraform workspace list | grep -w ${params.ENVIRONMENT}
+
                 then
+
                     terraform workspace select ${params.ENVIRONMENT}
+
                 else
+
                     terraform workspace new ${params.ENVIRONMENT}
+
                 fi
+
                 """
-            }
-        }
 
-        stage('Terraform Plan') {
-            when {
-                expression { return !params.DESTROY }
             }
-            steps {
-                sh 'terraform plan -out=tfplan > plan_output.txt'
-            }
-        }
 
-        stage('Manual Approval') {
-            when {
-                expression { return !params.DESTROY }
-            }
-            steps {
-                script {
-                    def planOutput = readFile('plan_output.txt')
-                    input message: "Review the Terraform Plan before applying:\n\n${planOutput}",
-                          ok: 'Proceed with Apply'
-                }
-            }
         }
+ 
+        stage('Terraform destroy') {
 
-        stage('Terraform Apply') {
-            when {
-                expression { return !params.DESTROY }
-            }
             steps {
-                sh 'terraform apply -auto-approve tfplan'
-            }
-        }
 
-        stage('Terraform Destroy') {
-            when {
-                expression { return params.DESTROY }
-            }
-            steps {
-                input message: "Are you sure you want to destroy the infrastructure?", ok: "Yes, Destroy"
                 sh 'terraform destroy -auto-approve'
+
             }
+
         }
+ 
     }
 
-    post {
-        success {
-            echo "Pipeline executed successfully."
-        }
-        failure {
-            echo "Pipeline failed. Check logs."
-        }
-    }
 }
+
+ 
