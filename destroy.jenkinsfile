@@ -40,26 +40,16 @@ pipeline {
             }
 
         }
- 
         stage('Terraform Init') {
-
             steps {
-
                 sh '''
-
                 terraform init -reconfigure \
-
                 -backend-config="bucket=terraform-remote-state-workspace2" \
-
                 -backend-config="key=terraform/terraform.tfstate" \
-
                 -backend-config="region=ap-south-1"
-
                 '''
-
-            }
-
-        }
+    }
+}
  
         stage('Workspace Setup') {
 
