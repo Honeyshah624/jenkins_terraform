@@ -1,65 +1,78 @@
-pipeline {
+pipeline {  
     agent any
-
+ 
+        environment {
+        // // AWS credentials from Jenkins credential store
+        AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
+        AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
+        AWS_DEFAULT_REGION    = 'ap-south-1'
+        TF_IN_AUTOMATION      = 'true'
+    }
+    
     parameters {
         choice(
-            name: 'ENV',
-            choices: ['dev','stage','prod'],
-            description: 'Select Terraform Workspace'
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'stage', 'prod'],
+            description: 'Select environment'
         )
     }
-
-    environment {
-        AWS_REGION = "ap-south-1"
-    }
-
+ 
+ 
+ 
     stages {
-
+ 
         stage('Checkout') {
             steps {
-                checkout scm
+                git branch: 'main', url: 'https://github.com/Honeyshah624/jenkins_terraform.git'
             }
         }
-
+ 
         stage('Terraform Init') {
+                environment {
+                AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
+                AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
+            }
+            steps {
+                sh '''
+                terraform init -reconfigure \
+                -backend-config="bucket=terraform-remote-state-workspace2" \
+                -backend-config="key=terraform/terraform.tfstate" \
+                -backend-config="region=ap-south-1"
+                '''
+            }
+        }
+ 
+        stage('Workspace Setup') {
             steps {
                 sh """
-                terraform init \
-                -backend-config="bucket=myproject-terraform-state-${ENV}" \
-                -backend-config="region=${AWS_REGION}" \
-                -backend-config="dynamodb_table=terraform-locks-${ENV}"
+                if terraform workspace list | grep -w ${params.ENVIRONMENT}
+                then
+                    terraform workspace select ${params.ENVIRONMENT}
+                else
+                    terraform workspace new ${params.ENVIRONMENT}
+                fi
                 """
             }
         }
-
-        stage('Workspace Handling') {
+ 
+    stage('Terraform Plan') {
+                environment {
+                AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
+                AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
+            }
             steps {
-                script {
-                    sh """
-                    if terraform workspace list | grep -qw ${ENV}; then
-                        echo "Workspace exists"
-                        terraform workspace select ${ENV}
-                    else
-                        echo "Creating workspace"
-                        terraform workspace new ${ENV}
-                    fi
-                    """
-                }
+                sh 'terraform plan'
             }
         }
-
-        stage('Terraform Plan') {
-            steps {
-                sh "terraform plan -var-file=env/${ENV}.tfvars"
-            }
-        }
-
+ 
         stage('Terraform Apply') {
+            environment {
+                AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
+                AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
+            }
             steps {
-                input "Approve Apply?"
-                sh "terraform apply -var-file=env/${ENV}.tfvars -auto-approve"
+                sh 'terraform apply -auto-approve'
             }
         }
-
     }
-}
+}   

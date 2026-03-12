@@ -1,6 +1,6 @@
-resource "aws_s3_bucket" "terraform-remote-state-workspace1" {
+resource "aws_s3_bucket" "terraform-remote-state-workspace2" {
 
-  bucket = "terraform-remote-state-workspace1-${terraform.workspace}"
+  bucket = "terraform-remote-state-workspace2-${terraform.workspace}"
 
   tags = {
     ResourceOwner    = "Honey shah"
@@ -13,9 +13,9 @@ resource "aws_s3_bucket" "terraform-remote-state-workspace1" {
 }
 
 
-resource "aws_s3_bucket_versioning" "terraform-remote-state-workspace1_versioning" {
+resource "aws_s3_bucket_versioning" "terraform-remote-state-workspace2_versioning" {
 
-  bucket = aws_s3_bucket.terraform-remote-state-workspace1.id
+  bucket = aws_s3_bucket.terraform-remote-state-workspace2.id
 
   versioning_configuration {
     status = "Enabled"
