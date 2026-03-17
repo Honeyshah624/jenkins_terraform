@@ -1,9 +1,7 @@
-pipeline {  
-
+pipeline {
     agent any
- 
-        environment {
 
+        environment {
         AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
 
         AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
@@ -11,11 +9,9 @@ pipeline {
         AWS_DEFAULT_REGION    = 'ap-south-1'
 
         TF_IN_AUTOMATION      = 'true'
-
-    }
+        }
 
     parameters {
-
         choice(
 
             name: 'ENVIRONMENT',
@@ -25,20 +21,13 @@ pipeline {
             description: 'Select environment'
 
         )
-
     }
- 
- 
+
     stages {
- 
         stage('Checkout') {
-
             steps {
-
                 git branch: 'main', url: 'https://github.com/Honeyshah624/jenkins_terraform.git'
-
             }
-
         }
         stage('Terraform Init') {
             steps {
@@ -48,13 +37,11 @@ pipeline {
                 -backend-config="key=terraform/terraform.tfstate" \
                 -backend-config="region=ap-south-1"
                 '''
-    }
-}
- 
+            }
+        }
+
         stage('Workspace Setup') {
-
             steps {
-
                 sh """
 
                 if terraform workspace list | grep -w ${params.ENVIRONMENT}
@@ -70,23 +57,14 @@ pipeline {
                 fi
 
                 """
-
             }
-
         }
- 
+
         stage('Terraform destroy') {
-
             steps {
-
                 sh 'terraform destroy -auto-approve'
-
             }
-
         }
- 
     }
-
 }
 
- 
