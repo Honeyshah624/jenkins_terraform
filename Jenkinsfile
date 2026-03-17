@@ -1,4 +1,4 @@
-pipeline {  
+pipeline {
     agent any
 
     environment {
@@ -7,12 +7,18 @@ pipeline {
         AWS_DEFAULT_REGION    = 'ap-south-1'
         TF_IN_AUTOMATION      = 'true'
     }
-    
+
     parameters {
         choice(
             name: 'ENVIRONMENT',
             choices: ['dev', 'stage', 'prod'],
             description: 'Select environment'
+        )
+
+        choice(
+            name: 'ACTION',
+            choices: ['apply', 'destroy'],
+            description: 'Select Terraform action'
         )
     }
 
@@ -49,34 +55,45 @@ pipeline {
         }
 
         stage('Terraform Plan') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
             steps {
-                sh 'terraform plan -out=tfplan > plan_output.txt'
+                sh 'terraform plan'
             }
         }
 
-        stage('Manual Approval') {
-            steps {
-                script {
-                    def planOutput = readFile('plan_output.txt')
-                    input message: "Review the Terraform Plan before applying:\n\n${planOutput}",
-                          ok: 'Proceed with Apply'
+        stage('Approval for Destroy (Prod Only)') {
+            when {
+                allOf {
+                    expression { params.ACTION == 'destroy' }
+                    expression { params.ENVIRONMENT == 'prod' }
                 }
             }
+            steps {
+                input message: "Are you sure you want to DESTROY the PROD infrastructure?"
+            }
         }
 
-        stage('Terraform Apply') {
+        stage('Terraform Apply / Destroy') {
             steps {
-                sh 'terraform apply -auto-approve tfplan'
+                script {
+                    if (params.ACTION == 'apply') {
+                        sh 'terraform apply -auto-approve'
+                    } else {
+                        sh 'terraform destroy -auto-approve'
+                    }
+                }
             }
         }
     }
 
     post {
         success {
-            echo "Terraform applied successfully."
+            echo "Pipeline executed successfully."
         }
         failure {
-            echo "Pipeline failed. Check logs."
+            echo "Pipeline failed. Please check logs."
         }
     }
 }
